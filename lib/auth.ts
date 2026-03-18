@@ -1,10 +1,6 @@
 import { getServerSession, type NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import { getGoogleOAuthCredentials } from "@/lib/google-oauth"
-import {
-  getAllowedGoogleUserByEmail,
-  updateAllowedGoogleUserSub,
-} from "@/lib/google-oauth-allowlist"
 
 type GoogleProfile = {
   sub?: string
@@ -52,23 +48,10 @@ export const authOptions: NextAuthOptions = {
         return "/auth/unauthorized?error=MissingGoogleProfile"
       }
 
-      const allowedUser = await getAllowedGoogleUserByEmail(email)
-      if (!allowedUser) {
-        return "/auth/unauthorized?error=NotAllowlisted"
-      }
-
-      if (allowedUser.googleSub && allowedUser.googleSub !== googleSub) {
-        return "/auth/unauthorized?error=GoogleSubjectMismatch"
-      }
-
-      if (!allowedUser.googleSub) {
-        await updateAllowedGoogleUserSub(allowedUser.id, googleSub)
-      }
-
       const authUser = user as AuthUser
-      authUser.displayName = allowedUser.displayName ?? user.name ?? email
+      authUser.displayName = user.name ?? email
       authUser.name = authUser.displayName
-      authUser.email = allowedUser.email
+      authUser.email = email
       authUser.googleSub = googleSub
 
       return true

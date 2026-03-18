@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,7 +59,6 @@ function parseAuthorInput(value: string) {
 export function PaperForm({ paper, mode }: PaperFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { data: session } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -147,19 +145,6 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
       group_id: prev.group_id ?? parsedGroupId,
     }))
   }, [mode, searchParams])
-
-  useEffect(() => {
-    if (mode !== "create") return
-
-    const sessionName = session?.user?.displayName || session?.user?.name || ""
-    const sessionEmail = session?.user?.email || ""
-
-    setFormData((prev) => ({
-      ...prev,
-      added_by: prev.added_by || sessionName,
-      added_by_email: prev.added_by_email || sessionEmail,
-    }))
-  }, [mode, session?.user?.displayName, session?.user?.email, session?.user?.name])
 
   const filteredTagSuggestions = useMemo(() => {
     const query = normalizeText(tagInput)

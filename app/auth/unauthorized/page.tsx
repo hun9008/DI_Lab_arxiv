@@ -7,14 +7,11 @@ interface UnauthorizedPageProps {
 
 function getMessage(error?: string) {
   switch (error) {
-    case "GoogleSubjectMismatch":
-      return "This email is allowlisted, but it was previously linked to a different Google account."
     case "MissingGoogleProfile":
       return "Google did not return the account information needed to verify access."
-    case "NotAllowlisted":
     case "AccessDenied":
     default:
-      return "This Google account is not in the lab allowlist."
+      return "This Google account could not be used to complete sign-in."
   }
 }
 
@@ -31,7 +28,7 @@ export default async function UnauthorizedPage({ searchParams }: UnauthorizedPag
           {getMessage(error)}
         </p>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Ask an admin to add your Google email to `google_oauth_allowlist`, then try again.
+          Try signing in again with another account or return to the sign-in page.
         </p>
         <div className="mt-6 space-y-3">
           <GoogleSignInButton label="Try another Google account" />

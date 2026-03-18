@@ -21,8 +21,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           Sign In Required
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          This archive is available only to approved Google accounts. Sign in with the Google
-          account that appears in the lab allowlist.
+          Sign in with your Google account to access the lab paper archive.
         </p>
         <div className="mt-6">
           <GoogleSignInButton callbackUrl={callbackUrl || "/"} />
