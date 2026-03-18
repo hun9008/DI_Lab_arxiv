@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Paper, PaperFormData, PaperGroup } from "@/lib/types"
 
 interface PaperFormProps {
@@ -60,13 +61,15 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isFindingInfo, setIsFindingInfo] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [infoLookupMessage, setInfoLookupMessage] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<PaperFormData>({
     title: paper?.title || "",
     authors: paper?.authors || [],
     conference: paper?.conference || "",
-    year: paper?.year || new Date().getFullYear(),
+    year: paper?.year ?? null,
     summary: paper?.summary || "",
     tags: paper?.tags || [],
     group_id: paper?.group_id || null,
@@ -83,6 +86,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   const [existingTags, setExistingTags] = useState<string[]>([])
   const [groups, setGroups] = useState<PaperGroup[]>([])
   const [isTagInputFocused, setIsTagInputFocused] = useState(false)
+
+  const clearError = () => {
+    setError(null)
+  }
 
   useEffect(() => {
     let isCancelled = false
@@ -159,6 +166,7 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   }, [existingTags, formData.tags, tagInput])
 
   const handleAddAuthor = () => {
+    clearError()
     const parsedAuthors = parseAuthorInput(authorInput)
     if (parsedAuthors.length === 0) return
 
@@ -183,6 +191,7 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   }
 
   const handleRemoveAuthor = (author: string) => {
+    clearError()
     setFormData((prev) => ({
       ...prev,
       authors: prev.authors.filter((a) => a !== author),
@@ -190,6 +199,7 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   }
 
   const handleAddTag = () => {
+    clearError()
     const rawTag = tagInput.trim()
     if (!rawTag) return
 
@@ -216,6 +226,7 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   }
 
   const handleRemoveTag = (tag: string) => {
+    clearError()
     setFormData((prev) => ({
       ...prev,
       tags: prev.tags.filter((t) => t !== tag),
@@ -270,6 +281,54 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
     }
   }
 
+  const handleFindInfo = async () => {
+    const title = formData.title.trim()
+
+    if (!title) {
+      setError("Enter a title first")
+      return
+    }
+
+    setIsFindingInfo(true)
+    setError(null)
+    setInfoLookupMessage(null)
+
+    try {
+      const response = await fetch(`/api/arxiv-authors?title=${encodeURIComponent(title)}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to find paper info")
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        authors: data.authors,
+        conference: prev.conference || data.conference || "",
+        year: prev.year ?? data.year ?? null,
+        arxiv_url: prev.arxiv_url || data.arxiv_url || "",
+      }))
+      const messageParts = [
+        `${data.authors.length} author(s)`,
+        data.year ? `year ${data.year}` : null,
+        data.conference ? `conference ${data.conference}` : null,
+      ].filter(Boolean)
+
+      setInfoLookupMessage(`Found ${messageParts.join(", ")} from arXiv.`)
+    } catch (lookupError) {
+      const message =
+        lookupError instanceof Error ? lookupError.message : "Failed to find paper info"
+
+      setError(
+        message === "No matching arXiv paper found"
+          ? "No matching arXiv paper found. Please enter the paper information manually."
+          : message
+      )
+    } finally {
+      setIsFindingInfo(false)
+    }
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
@@ -283,12 +342,36 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
         <label htmlFor="title" className="block text-sm font-medium text-foreground mb-1">
           Title <span className="text-destructive">*</span>
         </label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-          placeholder="Enter paper title"
-        />
+        <div className="flex gap-2">
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, title: e.target.value }))
+            }}
+            placeholder="Enter paper title"
+            className="flex-1"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleFindInfo}
+                disabled={isFindingInfo}
+              >
+                {isFindingInfo ? "Finding..." : "Find info"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Searches arXiv by title and tries to fill authors, conference, year, and arXiv URL.
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        {infoLookupMessage && (
+          <p className="mt-2 text-xs text-muted-foreground">{infoLookupMessage}</p>
+        )}
       </div>
 
       {/* Authors */}
@@ -299,7 +382,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
         <div className="flex gap-2">
           <Input
             value={authorInput}
-            onChange={(e) => setAuthorInput(e.target.value)}
+            onChange={(e) => {
+              clearError()
+              setAuthorInput(e.target.value)
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault()
@@ -346,7 +432,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
           <Input
             id="conference"
             value={formData.conference}
-            onChange={(e) => setFormData((prev) => ({ ...prev, conference: e.target.value }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, conference: e.target.value }))
+            }}
             placeholder="e.g., NeurIPS, CVPR"
           />
         </div>
@@ -358,10 +447,13 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             id="year"
             type="number"
             value={formData.year || ""}
-            onChange={(e) => setFormData((prev) => ({ 
-              ...prev, 
-              year: e.target.value ? parseInt(e.target.value) : null 
-            }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({
+                ...prev,
+                year: e.target.value ? parseInt(e.target.value) : null,
+              }))
+            }}
             placeholder="2024"
           />
         </div>
@@ -374,12 +466,13 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
         <select
           id="group_id"
           value={formData.group_id ?? ""}
-          onChange={(e) =>
+          onChange={(e) => {
+            clearError()
             setFormData((prev) => ({
               ...prev,
               group_id: e.target.value ? Number(e.target.value) : null,
             }))
-          }
+          }}
           className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
         >
           <option value="">No group</option>
@@ -399,7 +492,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
         <Textarea
           id="summary"
           value={formData.summary}
-          onChange={(e) => setFormData((prev) => ({ ...prev, summary: e.target.value }))}
+          onChange={(e) => {
+            clearError()
+            setFormData((prev) => ({ ...prev, summary: e.target.value }))
+          }}
           placeholder="Enter the paper's abstract or a brief summary"
           rows={5}
         />
@@ -414,7 +510,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
           <div className="flex gap-2">
             <Input
               value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
+              onChange={(e) => {
+                clearError()
+                setTagInput(e.target.value)
+              }}
               onFocus={() => setIsTagInputFocused(true)}
               onBlur={() => {
                 window.setTimeout(() => setIsTagInputFocused(false), 120)
@@ -482,7 +581,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             id="github_url"
             type="url"
             value={formData.github_url}
-            onChange={(e) => setFormData((prev) => ({ ...prev, github_url: e.target.value }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, github_url: e.target.value }))
+            }}
             placeholder="https://github.com/..."
           />
         </div>
@@ -494,7 +596,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             id="notion_url"
             type="url"
             value={formData.notion_url}
-            onChange={(e) => setFormData((prev) => ({ ...prev, notion_url: e.target.value }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, notion_url: e.target.value }))
+            }}
             placeholder="https://www.notion.so/..."
           />
         </div>
@@ -506,7 +611,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             id="arxiv_url"
             type="url"
             value={formData.arxiv_url}
-            onChange={(e) => setFormData((prev) => ({ ...prev, arxiv_url: e.target.value }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, arxiv_url: e.target.value }))
+            }}
             placeholder="https://arxiv.org/abs/..."
           />
         </div>
@@ -518,7 +626,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             id="other_url"
             type="url"
             value={formData.other_url}
-            onChange={(e) => setFormData((prev) => ({ ...prev, other_url: e.target.value }))}
+            onChange={(e) => {
+              clearError()
+              setFormData((prev) => ({ ...prev, other_url: e.target.value }))
+            }}
             placeholder="https://..."
           />
         </div>
@@ -535,7 +646,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             <Input
               id="added_by"
               value={formData.added_by}
-              onChange={(e) => setFormData((prev) => ({ ...prev, added_by: e.target.value }))}
+              onChange={(e) => {
+                clearError()
+                setFormData((prev) => ({ ...prev, added_by: e.target.value }))
+              }}
               placeholder="Your name"
             />
           </div>
@@ -547,7 +661,10 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
               id="added_by_email"
               type="email"
               value={formData.added_by_email}
-              onChange={(e) => setFormData((prev) => ({ ...prev, added_by_email: e.target.value }))}
+              onChange={(e) => {
+                clearError()
+                setFormData((prev) => ({ ...prev, added_by_email: e.target.value }))
+              }}
               placeholder="your@email.com"
             />
           </div>

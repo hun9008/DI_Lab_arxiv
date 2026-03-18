@@ -19,7 +19,7 @@ export function PaperItem({ paper, index }: PaperItemProps) {
   const yearHref = paper.year ? `/?year=${paper.year}` : null
 
   return (
-    <div className="py-3 border-b border-border last:border-b-0">
+    <div className="px-4 py-3 border-b border-border last:border-b-0">
       <div className="flex gap-3">
         <span className="text-xs text-muted-foreground font-mono shrink-0 pt-0.5 w-6">
           {index}.

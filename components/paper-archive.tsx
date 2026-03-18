@@ -18,24 +18,11 @@ interface PaperArchiveProps {
   showSubmitterFilter?: boolean
 }
 
-const DEFAULT_MEMBERS = [
-  "서민성",
-  "박동욱",
-  "강대희",
-  "손정한",
-  "강지우",
-  "권상희",
-  "박수민",
-  "정용훈",
-  "이형준",
-  "신현주",
-]
-
 export function PaperArchive({
   papers,
   groups = [],
   showGroupsSection = true,
-  showMemberSection = true,
+  showMemberSection = false,
   showSubmitterFilter = false,
 }: PaperArchiveProps) {
   const router = useRouter()
@@ -104,7 +91,6 @@ export function PaperArchive({
 
   const submitters = useMemo(() => {
     const set = new Set<string>()
-    DEFAULT_MEMBERS.forEach((member) => set.add(member))
     papers.forEach((paper) => {
       const submitter = paper.added_by.trim()
       if (submitter) {
