@@ -1,16 +1,44 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
+import { Folder, FolderPlus } from "lucide-react"
 import { useSearchParams } from "next/navigation"
-import { Paper } from "@/lib/types"
+import { useRouter } from "next/navigation"
+import { Paper, PaperGroup } from "@/lib/types"
 import { PaperItem } from "@/components/paper-item"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 interface PaperArchiveProps {
   papers: Paper[]
+  groups?: PaperGroup[]
+  showGroupsSection?: boolean
+  showMemberSection?: boolean
+  showSubmitterFilter?: boolean
 }
 
-export function PaperArchive({ papers }: PaperArchiveProps) {
+const DEFAULT_MEMBERS = [
+  "서민성",
+  "박동욱",
+  "강대희",
+  "손정한",
+  "강지우",
+  "권상희",
+  "박수민",
+  "정용훈",
+  "이형준",
+  "신현주",
+]
+
+export function PaperArchive({
+  papers,
+  groups = [],
+  showGroupsSection = true,
+  showMemberSection = true,
+  showSubmitterFilter = false,
+}: PaperArchiveProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedConference, setSelectedConference] = useState("")
@@ -18,6 +46,10 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
   const [selectedTag, setSelectedTag] = useState("")
   const [selectedSubmitter, setSelectedSubmitter] = useState("")
   const [selectedTagButton, setSelectedTagButton] = useState("")
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState("")
+  const [groupError, setGroupError] = useState<string | null>(null)
+  const [isSubmittingGroup, setIsSubmittingGroup] = useState(false)
 
   const conferences = useMemo(() => {
     const set = new Set<string>()
@@ -46,6 +78,7 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
     setSelectedConference(searchParams.get("conference") ?? "")
     setSelectedYear(searchParams.get("year") ?? "")
     setSelectedTag(searchParams.get("tag") ?? "")
+    setSelectedSubmitter(searchParams.get("added_by") ?? "")
   }, [searchParams])
 
   const filteredPapers = useMemo(() => {
@@ -62,12 +95,16 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
       if (selectedConference && paper.conference !== selectedConference) return false
       if (selectedYear && String(paper.year ?? "") !== selectedYear) return false
       if (selectedTag && !paper.tags.includes(selectedTag)) return false
+      if (showSubmitterFilter && selectedSubmitter) {
+        if (paper.added_by.toLowerCase() !== selectedSubmitter.toLowerCase()) return false
+      }
       return true
     })
-  }, [papers, searchQuery, selectedConference, selectedYear, selectedTag])
+  }, [papers, searchQuery, selectedConference, selectedYear, selectedTag, selectedSubmitter, showSubmitterFilter])
 
   const submitters = useMemo(() => {
     const set = new Set<string>()
+    DEFAULT_MEMBERS.forEach((member) => set.add(member))
     papers.forEach((paper) => {
       const submitter = paper.added_by.trim()
       if (submitter) {
@@ -96,9 +133,49 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
     setSelectedConference("")
     setSelectedYear("")
     setSelectedTag("")
+    setSelectedSubmitter("")
   }
 
-  const hasFilters = searchQuery || selectedConference || selectedYear || selectedTag
+  const hasFilters =
+    searchQuery ||
+    selectedConference ||
+    selectedYear ||
+    selectedTag ||
+    (showSubmitterFilter && selectedSubmitter)
+
+  const handleCreateGroup = async () => {
+    const name = newGroupName.trim()
+
+    if (!name) {
+      setGroupError("Group title is required")
+      return
+    }
+
+    setIsSubmittingGroup(true)
+    setGroupError(null)
+
+    try {
+      const response = await fetch("/api/paper-groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create group")
+      }
+
+      setNewGroupName("")
+      setIsCreatingGroup(false)
+      router.refresh()
+    } catch (error) {
+      setGroupError(error instanceof Error ? error.message : "Failed to create group")
+    } finally {
+      setIsSubmittingGroup(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -154,6 +231,21 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
               ))}
             </select>
           </div>
+          {showSubmitterFilter && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Added by:</span>
+              <select
+                value={selectedSubmitter}
+                onChange={(e) => setSelectedSubmitter(e.target.value)}
+                className="border border-border rounded px-2 py-1 text-sm bg-background"
+              >
+                <option value="">All</option>
+                {submitters.map((submitter) => (
+                  <option key={submitter} value={submitter}>{submitter}</option>
+                ))}
+              </select>
+            </div>
+          )}
           {hasFilters && (
             <button
               onClick={clearFilters}
@@ -165,8 +257,75 @@ export function PaperArchive({ papers }: PaperArchiveProps) {
         </div>
       </div>
 
+      {showGroupsSection && (
+        <section>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0 flex-1">
+              Groups
+            </h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsCreatingGroup((current) => !current)
+                setGroupError(null)
+              }}
+              className="shrink-0"
+            >
+              <FolderPlus className="mr-2 h-4 w-4" />
+              Group Add
+            </Button>
+          </div>
+          <div className="border-x border-b border-border bg-card p-4 space-y-4">
+            {groups.length > 0 ? (
+              <div className="flex flex-wrap gap-3">
+                {groups.map((group) => (
+                  <Link
+                    key={group.id}
+                    href={`/groups/${group.id}`}
+                    className="group relative inline-flex items-center gap-2 rounded-b-lg rounded-tr-lg border border-border bg-background px-4 py-2 text-sm text-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    <span className="absolute -top-2 left-3 h-2 w-6 rounded-t-md border border-b-0 border-border bg-background transition-colors group-hover:border-primary" />
+                    <Folder className="h-4 w-4" />
+                    <span>{group.name}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No groups yet. Create the first group to organize screenshots.
+              </div>
+            )}
+
+            {isCreatingGroup && (
+              <div className="rounded border border-dashed border-border bg-background p-4 space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Enter group title"
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleCreateGroup}
+                    disabled={isSubmittingGroup}
+                  >
+                    {isSubmittingGroup ? "Creating..." : "Create Group"}
+                  </Button>
+                </div>
+                {groupError && (
+                  <p className="text-sm text-destructive">{groupError}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* My Papers Section */}
-      {submitters.length > 0 && (
+      {showMemberSection && (
         <section>
           <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0">
             Member's Submissions

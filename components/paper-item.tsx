@@ -82,6 +82,17 @@ export function PaperItem({ paper, index }: PaperItemProps) {
             </p>
           )}
           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
+            {paper.group_name && (
+              <>
+                <Link
+                  href={`/groups/${paper.group_id}`}
+                  className="rounded border border-border bg-background px-2 py-0.5 hover:border-primary hover:text-primary"
+                >
+                  {paper.group_name}
+                </Link>
+                <span className="text-border">|</span>
+              </>
+            )}
             {(paper.conference || paper.year) && (
               <span className="font-medium">
                 {paper.conference && (

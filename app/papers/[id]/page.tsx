@@ -1,6 +1,7 @@
 import { Header } from "@/components/header"
 import { PaperDeleteButton } from "@/components/paper-delete-button"
-import { getPaperById } from "@/lib/papers"
+import { PaperItem } from "@/components/paper-item"
+import { getPaperById, listSimilarPapers } from "@/lib/papers"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 
@@ -19,6 +20,7 @@ export default async function PaperDetailPage({ params }: PageProps) {
   }
 
   const p = paper
+  const similarPapers = await listSimilarPapers(p)
   const scholarSearchUrl = `https://scholar.google.com/scholar?q=${encodeURIComponent(p.title)}`
 
   const submittedDate = new Date(p.created_at).toLocaleDateString("en-US", {
@@ -141,6 +143,17 @@ export default async function PaperDetailPage({ params }: PageProps) {
                 <span className="text-foreground">{p.tags.join(", ")}</span>
               </div>
             )}
+            {p.group_name && (
+              <div className="flex">
+                <span className="text-muted-foreground w-28 shrink-0">Group:</span>
+                <Link
+                  href={`/groups/${p.group_id}`}
+                  className="text-foreground hover:text-primary hover:underline"
+                >
+                  {p.group_name}
+                </Link>
+              </div>
+            )}
             <div className="flex">
               <span className="text-muted-foreground w-28 shrink-0">Submitted by:</span>
               <span className="text-foreground">
@@ -154,6 +167,23 @@ export default async function PaperDetailPage({ params }: PageProps) {
             </div>
           </div>
         </article>
+
+        {similarPapers.length > 0 && (
+          <section className="mt-6">
+            <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0">
+              Similar Papers
+            </h2>
+            <div className="border-x border-b border-border bg-card">
+              {similarPapers.map((similarPaper, index) => (
+                <PaperItem
+                  key={similarPaper.id}
+                  paper={similarPaper}
+                  index={index + 1}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Submission Info */}
         <div className="mt-4 text-xs text-muted-foreground text-center">

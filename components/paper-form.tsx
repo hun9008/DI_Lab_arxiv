@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
-import { Paper, PaperFormData } from "@/lib/types"
+import { Paper, PaperFormData, PaperGroup } from "@/lib/types"
 
 interface PaperFormProps {
   paper?: Paper
@@ -59,6 +59,7 @@ function parseAuthorInput(value: string) {
 
 export function PaperForm({ paper, mode }: PaperFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +71,7 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
     year: paper?.year || new Date().getFullYear(),
     summary: paper?.summary || "",
     tags: paper?.tags || [],
+    group_id: paper?.group_id || null,
     github_url: paper?.github_url || "",
     notion_url: paper?.notion_url || "",
     arxiv_url: paper?.arxiv_url || "",
@@ -81,17 +83,23 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   const [authorInput, setAuthorInput] = useState("")
   const [tagInput, setTagInput] = useState("")
   const [existingTags, setExistingTags] = useState<string[]>([])
+  const [groups, setGroups] = useState<PaperGroup[]>([])
   const [isTagInputFocused, setIsTagInputFocused] = useState(false)
 
   useEffect(() => {
     let isCancelled = false
 
-    async function loadExistingTags() {
+    async function loadReferenceData() {
       try {
-        const response = await fetch("/api/papers")
-        if (!response.ok) return
+        const [papersResponse, groupsResponse] = await Promise.all([
+          fetch("/api/papers"),
+          fetch("/api/paper-groups"),
+        ])
 
-        const papers = (await response.json()) as Paper[]
+        if (!papersResponse.ok || !groupsResponse.ok) return
+
+        const papers = (await papersResponse.json()) as Paper[]
+        const fetchedGroups = (await groupsResponse.json()) as PaperGroup[]
         const tagMap = new Map<string, string>()
 
         papers.forEach((entry) => {
@@ -108,20 +116,37 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
           setExistingTags(
             Array.from(tagMap.values()).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }))
           )
+          setGroups(fetchedGroups)
         }
       } catch {
         if (!isCancelled) {
           setExistingTags([])
+          setGroups([])
         }
       }
     }
 
-    loadExistingTags()
+    loadReferenceData()
 
     return () => {
       isCancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (mode !== "create") return
+
+    const groupIdFromQuery = searchParams.get("groupId")
+    if (!groupIdFromQuery) return
+
+    const parsedGroupId = Number(groupIdFromQuery)
+    if (!Number.isFinite(parsedGroupId)) return
+
+    setFormData((prev) => ({
+      ...prev,
+      group_id: prev.group_id ?? parsedGroupId,
+    }))
+  }, [mode, searchParams])
 
   useEffect(() => {
     if (mode !== "create") return
@@ -355,6 +380,30 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
             placeholder="2024"
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="group_id" className="block text-sm font-medium text-foreground mb-1">
+          Group
+        </label>
+        <select
+          id="group_id"
+          value={formData.group_id ?? ""}
+          onChange={(e) =>
+            setFormData((prev) => ({
+              ...prev,
+              group_id: e.target.value ? Number(e.target.value) : null,
+            }))
+          }
+          className="w-full rounded border border-border bg-background px-3 py-2 text-sm"
+        >
+          <option value="">No group</option>
+          {groups.map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Abstract */}

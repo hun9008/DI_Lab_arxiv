@@ -5,7 +5,11 @@ import { signOut, useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
-export function Header() {
+interface HeaderProps {
+  currentGroupName?: string
+}
+
+export function Header({ currentGroupName }: HeaderProps) {
   const pathname = usePathname()
   const { data: session } = useSession()
   const displayName = session?.user?.displayName || session?.user?.name || session?.user?.email
@@ -14,11 +18,18 @@ export function Header() {
     <header className="border-b border-border bg-background">
       <div className="mx-auto max-w-4xl px-4">
         <div className="flex items-center justify-between py-3">
-          <Link href="/" className="group">
-            <h1 className="font-serif text-2xl font-bold text-primary tracking-tight">
-              Lab Paper Archive
-            </h1>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="group">
+              <h1 className="font-serif text-2xl font-bold text-primary tracking-tight">
+                Lab Paper Archive
+              </h1>
+            </Link>
+            {currentGroupName && (
+              <span className="text-lg font-serif text-muted-foreground">
+                / {currentGroupName}
+              </span>
+            )}
+          </div>
           <nav className="flex items-center gap-4 text-sm">
             <Link
               href="/"
@@ -38,11 +49,24 @@ export function Header() {
             >
               Submit
             </Link>
+            {currentGroupName && (
+              <Link
+                href="/"
+                className="text-muted-foreground transition-colors hover:text-primary"
+              >
+                Out Group
+              </Link>
+            )}
             {displayName && (
               <>
-                <span className="text-xs text-muted-foreground">
+                <a
+                  href="https://sites.google.com/view/unist-dilab/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-muted-foreground transition-colors hover:text-primary hover:underline"
+                >
                   {displayName}
-                </span>
+                </a>
                 <button
                   type="button"
                   onClick={() => signOut({ callbackUrl: "/auth/signin" })}
@@ -55,7 +79,9 @@ export function Header() {
           </nav>
         </div>
         <div className="border-t border-border py-2 text-xs text-muted-foreground">
-          Search and browse research papers shared by lab members
+          {currentGroupName
+            ? `Browse papers collected in ${currentGroupName}`
+            : "Search and browse research papers shared by lab members"}
         </div>
       </div>
     </header>
