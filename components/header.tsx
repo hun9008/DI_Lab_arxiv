@@ -1,11 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { signOut, useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 export function Header() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const displayName = session?.user?.displayName || session?.user?.name || session?.user?.email
 
   return (
     <header className="border-b border-border bg-background">
@@ -35,6 +38,20 @@ export function Header() {
             >
               Submit
             </Link>
+            {displayName && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {displayName}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+                  className="text-muted-foreground transition-colors hover:text-primary"
+                >
+                  Sign out
+                </button>
+              </>
+            )}
           </nav>
         </div>
         <div className="border-t border-border py-2 text-xs text-muted-foreground">

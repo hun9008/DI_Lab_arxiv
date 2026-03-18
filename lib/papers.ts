@@ -11,8 +11,10 @@ interface PaperRow extends RowDataPacket {
   year: number | null
   summary: string | null
   tags: unknown
-  pdf_url: string | null
+  github_url: string | null
+  notion_url: string | null
   arxiv_url: string | null
+  other_url: string | null
   added_by: string
   added_by_email: string | null
   created_at: string
@@ -59,8 +61,10 @@ function mapPaperRow(row: PaperRow): Paper {
     year: row.year,
     summary: row.summary,
     tags: parseJsonArray(row.tags),
-    pdf_url: row.pdf_url,
+    github_url: row.github_url,
+    notion_url: row.notion_url,
     arxiv_url: row.arxiv_url,
+    other_url: row.other_url,
     added_by: row.added_by,
     added_by_email: row.added_by_email,
     created_at: row.created_at,
@@ -76,8 +80,10 @@ function toPaperParams(input: PaperFormData) {
     year: input.year,
     summary: normalizeOptionalString(input.summary),
     tags: JSON.stringify(input.tags.map((tag) => tag.trim()).filter(Boolean)),
-    pdf_url: normalizeOptionalString(input.pdf_url),
+    github_url: normalizeOptionalString(input.github_url),
+    notion_url: normalizeOptionalString(input.notion_url),
     arxiv_url: normalizeOptionalString(input.arxiv_url),
+    other_url: normalizeOptionalString(input.other_url),
     added_by: input.added_by.trim(),
     added_by_email: normalizeOptionalString(input.added_by_email),
   }
@@ -94,8 +100,10 @@ export async function listPapers() {
       year,
       summary,
       tags,
-      pdf_url,
+      github_url,
+      notion_url,
       arxiv_url,
+      other_url,
       added_by,
       added_by_email,
       created_at,
@@ -118,8 +126,10 @@ export async function getPaperById(id: string) {
       year,
       summary,
       tags,
-      pdf_url,
+      github_url,
+      notion_url,
       arxiv_url,
+      other_url,
       added_by,
       added_by_email,
       created_at,
@@ -148,11 +158,13 @@ export async function createPaper(input: PaperFormData) {
       year,
       summary,
       tags,
-      pdf_url,
+      github_url,
+      notion_url,
       arxiv_url,
+      other_url,
       added_by,
       added_by_email
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       paper.title,
@@ -161,8 +173,10 @@ export async function createPaper(input: PaperFormData) {
       paper.year,
       paper.summary,
       paper.tags,
-      paper.pdf_url,
+      paper.github_url,
+      paper.notion_url,
       paper.arxiv_url,
+      paper.other_url,
       paper.added_by,
       paper.added_by_email,
     ]
@@ -184,8 +198,10 @@ export async function updatePaper(id: string, input: PaperFormData) {
       year = ?,
       summary = ?,
       tags = ?,
-      pdf_url = ?,
+      github_url = ?,
+      notion_url = ?,
       arxiv_url = ?,
+      other_url = ?,
       added_by = ?,
       added_by_email = ?
     WHERE id = ?`,
@@ -196,8 +212,10 @@ export async function updatePaper(id: string, input: PaperFormData) {
       paper.year,
       paper.summary,
       paper.tags,
-      paper.pdf_url,
+      paper.github_url,
+      paper.notion_url,
       paper.arxiv_url,
+      paper.other_url,
       paper.added_by,
       paper.added_by_email,
       id,

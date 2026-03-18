@@ -13,6 +13,11 @@ export function PaperItem({ paper, index }: PaperItemProps) {
     year: "numeric",
   })
 
+  const conferenceHref = paper.conference
+    ? `/?conference=${encodeURIComponent(paper.conference)}`
+    : null
+  const yearHref = paper.year ? `/?year=${paper.year}` : null
+
   return (
     <div className="py-3 border-b border-border last:border-b-0">
       <div className="flex gap-3">
@@ -27,14 +32,24 @@ export function PaperItem({ paper, index }: PaperItemProps) {
             >
               {paper.title}
             </Link>
-            {paper.pdf_url && (
+            {paper.github_url && (
               <a
-                href={paper.pdf_url}
+                href={paper.github_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-accent hover:underline shrink-0"
               >
-                [pdf]
+                [github]
+              </a>
+            )}
+            {paper.notion_url && (
+              <a
+                href={paper.notion_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent hover:underline shrink-0"
+              >
+                [notion]
               </a>
             )}
             {paper.arxiv_url && (
@@ -47,6 +62,16 @@ export function PaperItem({ paper, index }: PaperItemProps) {
                 [arXiv]
               </a>
             )}
+            {paper.other_url && (
+              <a
+                href={paper.other_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent hover:underline shrink-0"
+              >
+                [other]
+              </a>
+            )}
           </div>
           <p className="text-sm text-foreground mt-0.5">
             {paper.authors.join(", ")}
@@ -57,9 +82,29 @@ export function PaperItem({ paper, index }: PaperItemProps) {
             </p>
           )}
           <div className="flex items-center gap-2 mt-1.5 text-xs text-muted-foreground flex-wrap">
-            {paper.conference && (
+            {(paper.conference || paper.year) && (
               <span className="font-medium">
-                {paper.conference}{paper.year ? ` ${paper.year}` : ""}
+                {paper.conference && (
+                  conferenceHref ? (
+                    <Link href={conferenceHref} className="hover:text-primary hover:underline">
+                      {paper.conference}
+                    </Link>
+                  ) : (
+                    paper.conference
+                  )
+                )}
+                {paper.year && (
+                  <>
+                    {paper.conference ? " " : ""}
+                    {yearHref ? (
+                      <Link href={yearHref} className="hover:text-primary hover:underline">
+                        {paper.year}
+                      </Link>
+                    ) : (
+                      paper.year
+                    )}
+                  </>
+                )}
               </span>
             )}
             {paper.tags.length > 0 && (
@@ -67,7 +112,13 @@ export function PaperItem({ paper, index }: PaperItemProps) {
                 <span className="text-border">|</span>
                 {paper.tags.map((tag, i) => (
                   <span key={tag} className="text-muted-foreground">
-                    {tag}{i < paper.tags.length - 1 ? "," : ""}
+                    <Link
+                      href={`/?tag=${encodeURIComponent(tag)}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {tag}
+                    </Link>
+                    {i < paper.tags.length - 1 ? "," : ""}
                   </span>
                 ))}
               </>

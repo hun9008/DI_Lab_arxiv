@@ -1,4 +1,5 @@
 import { deletePaper, getPaperById, updatePaper } from "@/lib/papers"
+import { getAuthSession } from "@/lib/auth"
 import { type PaperFormData } from "@/lib/types"
 import { NextResponse } from "next/server"
 
@@ -9,6 +10,11 @@ export async function GET(
   const { id } = await params
 
   try {
+    const session = await getAuthSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const paper = await getPaperById(id)
 
     if (!paper) {
@@ -28,6 +34,11 @@ export async function PUT(
 ) {
   const { id } = await params
   try {
+    const session = await getAuthSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = (await request.json()) as PaperFormData
     const paper = await updatePaper(id, body)
 
@@ -49,6 +60,11 @@ export async function DELETE(
   const { id } = await params
 
   try {
+    const session = await getAuthSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const deleted = await deletePaper(id)
 
     if (!deleted) {

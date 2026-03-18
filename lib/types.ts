@@ -6,8 +6,10 @@ export interface Paper {
   year: number | null
   summary: string | null
   tags: string[]
-  pdf_url: string | null
+  github_url: string | null
+  notion_url: string | null
   arxiv_url: string | null
+  other_url: string | null
   added_by: string
   added_by_email: string | null
   created_at: string
@@ -21,8 +23,10 @@ export interface PaperFormData {
   year: number | null
   summary: string
   tags: string[]
-  pdf_url: string
+  github_url: string
+  notion_url: string
   arxiv_url: string
+  other_url: string
   added_by: string
   added_by_email: string
 }

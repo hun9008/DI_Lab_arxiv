@@ -1,9 +1,15 @@
 import { createPaper, listPapers } from "@/lib/papers"
+import { getAuthSession } from "@/lib/auth"
 import { type PaperFormData } from "@/lib/types"
 import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
+    const session = await getAuthSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const papers = await listPapers()
     return NextResponse.json(papers)
   } catch (error) {
@@ -14,6 +20,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const session = await getAuthSession()
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = (await request.json()) as PaperFormData
     const paper = await createPaper(body)
 

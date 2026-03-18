@@ -1,0 +1,1 @@
+docker exec -it lab-paper-mysql mysql -u root -p

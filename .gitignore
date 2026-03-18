@@ -5,3 +5,6 @@ docker-compose.yml
 mysql_init.sql
 node_modules
 dist
+client_secret_377733211483-oh2apbagiepqr7ideth64tp0ju9eff9s.apps.googleusercontent.com.json
+.secure
+lab_paper_archive_dump.sql

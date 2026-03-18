@@ -1,21 +1,65 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Spinner } from "@/components/ui/spinner"
 import { Paper, PaperFormData } from "@/lib/types"
-import { getUserName, setUserName } from "@/lib/user-store"
 
 interface PaperFormProps {
   paper?: Paper
   mode: "create" | "edit"
 }
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function looksLikeInitials(value: string) {
+  const compact = value.replace(/\s+/g, "")
+  return /^(?:[A-Za-z]\.?|-)+(?:\.)?$/.test(compact) && compact.length <= 10
+}
+
+function parseAuthorInput(value: string) {
+  const normalized = value
+    .replace(/\s*&\s*/g, ", ")
+    .replace(/\s+and\s+/gi, ", ")
+    .trim()
+
+  if (!normalized) return []
+
+  const citationTokens = normalized
+    .split(",")
+    .map((token) => token.trim().replace(/^&\s*/, ""))
+    .filter(Boolean)
+
+  const isCitationStyle =
+    citationTokens.length >= 2 &&
+    citationTokens.length % 2 === 0 &&
+    citationTokens.every((token, index) => index % 2 === 0 || looksLikeInitials(token))
+
+  if (isCitationStyle) {
+    const authors: string[] = []
+
+    for (let i = 0; i < citationTokens.length; i += 2) {
+      authors.push(`${citationTokens[i]}, ${citationTokens[i + 1]}`)
+    }
+
+    return authors
+  }
+
+  return normalized
+    .split(/[,;\n]+/)
+    .map((token) => token.trim().replace(/^&\s*/, ""))
+    .filter(Boolean)
+}
+
 export function PaperForm({ paper, mode }: PaperFormProps) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,32 +70,106 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
     year: paper?.year || new Date().getFullYear(),
     summary: paper?.summary || "",
     tags: paper?.tags || [],
-    pdf_url: paper?.pdf_url || "",
+    github_url: paper?.github_url || "",
+    notion_url: paper?.notion_url || "",
     arxiv_url: paper?.arxiv_url || "",
+    other_url: paper?.other_url || "",
     added_by: paper?.added_by || "",
     added_by_email: paper?.added_by_email || "",
   })
 
   const [authorInput, setAuthorInput] = useState("")
   const [tagInput, setTagInput] = useState("")
+  const [existingTags, setExistingTags] = useState<string[]>([])
+  const [isTagInputFocused, setIsTagInputFocused] = useState(false)
 
   useEffect(() => {
-    if (mode === "create") {
-      const storedName = getUserName()
-      if (storedName) {
-        setFormData((prev) => ({ ...prev, added_by: storedName }))
+    let isCancelled = false
+
+    async function loadExistingTags() {
+      try {
+        const response = await fetch("/api/papers")
+        if (!response.ok) return
+
+        const papers = (await response.json()) as Paper[]
+        const tagMap = new Map<string, string>()
+
+        papers.forEach((entry) => {
+          entry.tags.forEach((tag) => {
+            const trimmed = tag.trim()
+            const key = normalizeText(trimmed)
+            if (trimmed && !tagMap.has(key)) {
+              tagMap.set(key, trimmed)
+            }
+          })
+        })
+
+        if (!isCancelled) {
+          setExistingTags(
+            Array.from(tagMap.values()).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }))
+          )
+        }
+      } catch {
+        if (!isCancelled) {
+          setExistingTags([])
+        }
       }
     }
-  }, [mode])
+
+    loadExistingTags()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (mode !== "create") return
+
+    const sessionName = session?.user?.displayName || session?.user?.name || ""
+    const sessionEmail = session?.user?.email || ""
+
+    setFormData((prev) => ({
+      ...prev,
+      added_by: prev.added_by || sessionName,
+      added_by_email: prev.added_by_email || sessionEmail,
+    }))
+  }, [mode, session?.user?.displayName, session?.user?.email, session?.user?.name])
+
+  const filteredTagSuggestions = useMemo(() => {
+    const query = normalizeText(tagInput)
+
+    return existingTags.filter((tag) => {
+      const tagKey = normalizeText(tag)
+      const alreadyAdded = formData.tags.some((selectedTag) => normalizeText(selectedTag) === tagKey)
+      if (alreadyAdded) return false
+      if (!query) return true
+      return tagKey.includes(query)
+    })
+  }, [existingTags, formData.tags, tagInput])
 
   const handleAddAuthor = () => {
-    if (authorInput.trim() && !formData.authors.includes(authorInput.trim())) {
-      setFormData((prev) => ({
+    const parsedAuthors = parseAuthorInput(authorInput)
+    if (parsedAuthors.length === 0) return
+
+    setFormData((prev) => {
+      const existingAuthorKeys = new Set(prev.authors.map((author) => normalizeText(author)))
+      const nextAuthors = [...prev.authors]
+
+      parsedAuthors.forEach((author) => {
+        const key = normalizeText(author)
+        if (key && !existingAuthorKeys.has(key)) {
+          existingAuthorKeys.add(key)
+          nextAuthors.push(author)
+        }
+      })
+
+      return {
         ...prev,
-        authors: [...prev.authors, authorInput.trim()],
-      }))
-      setAuthorInput("")
-    }
+        authors: nextAuthors,
+      }
+    })
+    setAuthorInput("")
   }
 
   const handleRemoveAuthor = (author: string) => {
@@ -62,13 +180,29 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   }
 
   const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData((prev) => ({
+    const rawTag = tagInput.trim()
+    if (!rawTag) return
+
+    const existingTagMatch = existingTags.find(
+      (tag) => normalizeText(tag) === normalizeText(rawTag)
+    )
+    const normalizedTag = existingTagMatch || rawTag
+
+    setFormData((prev) => {
+      const alreadyExists = prev.tags.some(
+        (tag) => normalizeText(tag) === normalizeText(normalizedTag)
+      )
+
+      if (alreadyExists) {
+        return prev
+      }
+
+      return {
         ...prev,
-        tags: [...prev.tags, tagInput.trim()],
-      }))
-      setTagInput("")
-    }
+        tags: [...prev.tags, normalizedTag],
+      }
+    })
+    setTagInput("")
   }
 
   const handleRemoveTag = (tag: string) => {
@@ -100,9 +234,6 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
       setIsSubmitting(false)
       return
     }
-
-    // Save user name for future submissions
-    setUserName(formData.added_by.trim())
 
     try {
       const url = mode === "create" ? "/api/papers" : `/api/papers/${paper?.id}`
@@ -165,16 +296,19 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
                 handleAddAuthor()
               }
             }}
-            placeholder="Type author name and press Enter"
+            placeholder="Type authors and press Enter"
             className="flex-1"
           />
           <Button type="button" variant="outline" size="sm" onClick={handleAddAuthor}>
             Add
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          You can add one author or paste a citation-style list like `Kim, S., Kang, H., & Park, C.`
+        </p>
         {formData.authors.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
-            {formData.authors.map((author, i) => (
+            {formData.authors.map((author) => (
               <span
                 key={author}
                 className="inline-flex items-center gap-1 bg-secondary text-secondary-foreground text-sm px-2 py-0.5 rounded"
@@ -242,22 +376,46 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
         <label className="block text-sm font-medium text-foreground mb-1">
           Tags / Subjects
         </label>
-        <div className="flex gap-2">
-          <Input
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault()
-                handleAddTag()
-              }
-            }}
-            placeholder="e.g., LLM, Vision, RL"
-            className="flex-1"
-          />
-          <Button type="button" variant="outline" size="sm" onClick={handleAddTag}>
-            Add
-          </Button>
+        <div className="relative">
+          <div className="flex gap-2">
+            <Input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onFocus={() => setIsTagInputFocused(true)}
+              onBlur={() => {
+                window.setTimeout(() => setIsTagInputFocused(false), 120)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  handleAddTag()
+                }
+              }}
+              placeholder="e.g., LLM, Vision, RL"
+              className="flex-1"
+            />
+            <Button type="button" variant="outline" size="sm" onClick={handleAddTag}>
+              Add
+            </Button>
+          </div>
+          {isTagInputFocused && filteredTagSuggestions.length > 0 && (
+            <div className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded border border-border bg-background shadow-sm">
+              {filteredTagSuggestions.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    setTagInput(tag)
+                    setIsTagInputFocused(false)
+                  }}
+                  className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-accent/10"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {formData.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -283,6 +441,30 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
       {/* Links */}
       <div className="grid grid-cols-2 gap-4">
         <div>
+          <label htmlFor="github_url" className="block text-sm font-medium text-foreground mb-1">
+            GitHub URL
+          </label>
+          <Input
+            id="github_url"
+            type="url"
+            value={formData.github_url}
+            onChange={(e) => setFormData((prev) => ({ ...prev, github_url: e.target.value }))}
+            placeholder="https://github.com/..."
+          />
+        </div>
+        <div>
+          <label htmlFor="notion_url" className="block text-sm font-medium text-foreground mb-1">
+            Notion URL
+          </label>
+          <Input
+            id="notion_url"
+            type="url"
+            value={formData.notion_url}
+            onChange={(e) => setFormData((prev) => ({ ...prev, notion_url: e.target.value }))}
+            placeholder="https://www.notion.so/..."
+          />
+        </div>
+        <div>
           <label htmlFor="arxiv_url" className="block text-sm font-medium text-foreground mb-1">
             arXiv URL
           </label>
@@ -295,14 +477,14 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
           />
         </div>
         <div>
-          <label htmlFor="pdf_url" className="block text-sm font-medium text-foreground mb-1">
-            PDF URL
+          <label htmlFor="other_url" className="block text-sm font-medium text-foreground mb-1">
+            Other URL
           </label>
           <Input
-            id="pdf_url"
+            id="other_url"
             type="url"
-            value={formData.pdf_url}
-            onChange={(e) => setFormData((prev) => ({ ...prev, pdf_url: e.target.value }))}
+            value={formData.other_url}
+            onChange={(e) => setFormData((prev) => ({ ...prev, other_url: e.target.value }))}
             placeholder="https://..."
           />
         </div>
