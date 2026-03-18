@@ -23,6 +23,13 @@ interface PaperRow extends RowDataPacket {
   updated_at: string
 }
 
+export class DuplicatePaperTitleError extends Error {
+  constructor() {
+    super("A paper with the same title already exists")
+    this.name = "DuplicatePaperTitleError"
+  }
+}
+
 function parseJsonArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((item) => String(item))
@@ -52,6 +59,22 @@ function parseJsonArray(value: unknown): string[] {
 function normalizeOptionalString(value: string | null | undefined) {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+async function hasDuplicateTitle(title: string, excludeId?: string) {
+  const pool = getPool()
+  const normalizedTitle = title.trim()
+
+  const [rows] = await pool.query<Array<RowDataPacket & { id: string }>>(
+    `SELECT id
+    FROM papers
+    WHERE LOWER(TRIM(title)) = LOWER(TRIM(?))
+      ${excludeId ? "AND id <> ?" : ""}
+    LIMIT 1`,
+    excludeId ? [normalizedTitle, excludeId] : [normalizedTitle]
+  )
+
+  return rows.length > 0
 }
 
 function mapPaperRow(row: PaperRow): Paper {
@@ -190,6 +213,10 @@ export async function createPaper(input: PaperFormData) {
   const id = randomUUID()
   const paper = toPaperParams(input)
 
+  if (await hasDuplicateTitle(paper.title)) {
+    throw new DuplicatePaperTitleError()
+  }
+
   await pool.execute<ResultSetHeader>(
     `INSERT INTO papers (
       id,
@@ -231,6 +258,10 @@ export async function createPaper(input: PaperFormData) {
 export async function updatePaper(id: string, input: PaperFormData) {
   const pool = getPool()
   const paper = toPaperParams(input)
+
+  if (await hasDuplicateTitle(paper.title, id)) {
+    throw new DuplicatePaperTitleError()
+  }
 
   const [result] = await pool.execute<ResultSetHeader>(
     `UPDATE papers

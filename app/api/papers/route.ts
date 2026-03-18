@@ -1,4 +1,4 @@
-import { createPaper, listPapers } from "@/lib/papers"
+import { createPaper, DuplicatePaperTitleError, listPapers } from "@/lib/papers"
 import { getAuthSession } from "@/lib/auth"
 import { type PaperFormData } from "@/lib/types"
 import { NextResponse } from "next/server"
@@ -35,6 +35,9 @@ export async function POST(request: Request) {
     return NextResponse.json(paper, { status: 201 })
   } catch (error) {
     console.error("Error creating paper:", error)
+    if (error instanceof DuplicatePaperTitleError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     return NextResponse.json({ error: "Failed to create paper" }, { status: 500 })
   }
 }

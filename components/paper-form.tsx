@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -60,6 +60,7 @@ function parseAuthorInput(value: string) {
 export function PaperForm({ paper, mode }: PaperFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const errorRef = useRef<HTMLDivElement | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFindingInfo, setIsFindingInfo] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -152,6 +153,13 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
       group_id: prev.group_id ?? parsedGroupId,
     }))
   }, [mode, searchParams])
+
+  useEffect(() => {
+    if (!error || !errorRef.current) return
+
+    errorRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    errorRef.current.focus()
+  }, [error])
 
   const filteredTagSuggestions = useMemo(() => {
     const query = normalizeText(tagInput)
@@ -332,7 +340,11 @@ export function PaperForm({ paper, mode }: PaperFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="border border-destructive bg-destructive/5 p-3 text-sm text-destructive">
+        <div
+          ref={errorRef}
+          tabIndex={-1}
+          className="border border-destructive bg-destructive/5 p-3 text-sm text-destructive"
+        >
           {error}
         </div>
       )}

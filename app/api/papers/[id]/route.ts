@@ -1,4 +1,9 @@
-import { deletePaper, getPaperById, updatePaper } from "@/lib/papers"
+import {
+  deletePaper,
+  DuplicatePaperTitleError,
+  getPaperById,
+  updatePaper,
+} from "@/lib/papers"
 import { getAuthSession } from "@/lib/auth"
 import { type PaperFormData } from "@/lib/types"
 import { NextResponse } from "next/server"
@@ -49,6 +54,9 @@ export async function PUT(
     return NextResponse.json(paper)
   } catch (error) {
     console.error("Error updating paper:", error)
+    if (error instanceof DuplicatePaperTitleError) {
+      return NextResponse.json({ error: error.message }, { status: 409 })
+    }
     return NextResponse.json({ error: "Failed to update paper" }, { status: 500 })
   }
 }
