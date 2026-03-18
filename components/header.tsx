@@ -4,6 +4,7 @@ import Link from "next/link"
 import { signOut, useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
@@ -22,7 +23,7 @@ export function Header({ currentGroupName }: HeaderProps) {
           <div className="flex items-center gap-3">
             <Link href="/" className="group">
               <h1 className="font-serif text-2xl font-bold text-primary tracking-tight">
-                Lab Paper Archive
+                DI Lab Paper Archive
               </h1>
             </Link>
             {currentGroupName && (
@@ -33,19 +34,13 @@ export function Header({ currentGroupName }: HeaderProps) {
           </div>
           <nav className="flex items-center gap-4 text-sm">
             <Link
-              href="/"
-              className={cn(
-                "hover:text-primary transition-colors",
-                pathname === "/" ? "text-primary font-medium" : "text-muted-foreground"
-              )}
-            >
-              Browse
-            </Link>
-            <Link
               href="/submit"
               className={cn(
-                "hover:text-primary transition-colors",
-                pathname === "/submit" ? "text-primary font-medium" : "text-muted-foreground"
+                buttonVariants({ variant: "default", size: "sm" }),
+                "rounded-md px-4 shadow-none",
+                pathname === "/submit"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
               )}
             >
               Submit
