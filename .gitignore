@@ -1,0 +1,7 @@
+.next
+.env.example
+.env.local
+docker-compose.yml
+mysql_init.sql
+node_modules
+dist
