@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
 import { GroupDeleteButton } from "@/components/group-delete-button"
+import { GroupDownloadButton } from "@/components/group-download-button"
 import { Header } from "@/components/header"
 import { GroupPaperManager } from "@/components/group-paper-manager"
 import { PaperArchive } from "@/components/paper-archive"
@@ -59,6 +60,9 @@ export default async function GroupPage({ params }: PageProps) {
           showGroupsSection={false}
           showMemberSection={false}
           showSubmitterFilter={true}
+          showAllPapersDownload={false}
+          allPapersTitle={`${group.name} Group Papers`}
+          allPapersActions={<GroupDownloadButton groupId={group.id} />}
         />
         <GroupDeleteButton groupId={group.id} groupName={group.name} />
       </main>

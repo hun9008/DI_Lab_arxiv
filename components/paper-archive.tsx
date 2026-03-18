@@ -1,14 +1,16 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Folder, FolderPlus } from "lucide-react"
+import { Download, Folder, FolderPlus } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { useRouter } from "next/navigation"
 import { Paper, PaperGroup } from "@/lib/types"
 import { PaperItem } from "@/components/paper-item"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface PaperArchiveProps {
   papers: Paper[]
@@ -16,6 +18,9 @@ interface PaperArchiveProps {
   showGroupsSection?: boolean
   showMemberSection?: boolean
   showSubmitterFilter?: boolean
+  showAllPapersDownload?: boolean
+  allPapersTitle?: string
+  allPapersActions?: ReactNode
 }
 
 export function PaperArchive({
@@ -24,6 +29,9 @@ export function PaperArchive({
   showGroupsSection = true,
   showMemberSection = false,
   showSubmitterFilter = false,
+  showAllPapersDownload = true,
+  allPapersTitle = "All Papers",
+  allPapersActions,
 }: PaperArchiveProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -32,7 +40,7 @@ export function PaperArchive({
   const [selectedYear, setSelectedYear] = useState("")
   const [selectedTag, setSelectedTag] = useState("")
   const [selectedSubmitter, setSelectedSubmitter] = useState("")
-  const [selectedTagButton, setSelectedTagButton] = useState("")
+  const [selectedTagButtons, setSelectedTagButtons] = useState<string[]>([])
   const [isCreatingGroup, setIsCreatingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState("")
   const [groupError, setGroupError] = useState<string | null>(null)
@@ -108,11 +116,16 @@ export function PaperArchive({
   }, [filteredPapers, selectedSubmitter])
 
   const taggedPapers = useMemo(() => {
-    if (!selectedTagButton) return []
+    if (selectedTagButtons.length === 0) return []
+
+    const selectedTagKeys = new Set(selectedTagButtons.map((tag) => tag.toLowerCase()))
+
     return filteredPapers.filter((paper) =>
-      paper.tags.some((tag) => tag.toLowerCase() === selectedTagButton.toLowerCase())
+      selectedTagButtons.every((selectedTag) =>
+        paper.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase())
+      )
     )
-  }, [filteredPapers, selectedTagButton])
+  }, [filteredPapers, selectedTagButtons])
 
   const clearFilters = () => {
     setSearchQuery("")
@@ -128,6 +141,38 @@ export function PaperArchive({
     selectedYear ||
     selectedTag ||
     (showSubmitterFilter && selectedSubmitter)
+
+  const allPapersDownloadHref = useMemo(() => {
+    const params = new URLSearchParams()
+
+    if (searchQuery) params.set("q", searchQuery)
+    if (selectedConference) params.set("conference", selectedConference)
+    if (selectedYear) params.set("year", selectedYear)
+    if (selectedTag) params.set("tag", selectedTag)
+    if (showSubmitterFilter && selectedSubmitter) {
+      params.set("added_by", selectedSubmitter)
+    }
+
+    const queryString = params.toString()
+    return queryString ? `/api/papers/download?${queryString}` : "/api/papers/download"
+  }, [
+    searchQuery,
+    selectedConference,
+    selectedYear,
+    selectedTag,
+    selectedSubmitter,
+    showSubmitterFilter,
+  ])
+
+  const selectedTagDownloadHref = useMemo(() => {
+    if (selectedTagButtons.length === 0) {
+      return "/api/papers/download"
+    }
+
+    const params = new URLSearchParams()
+    selectedTagButtons.forEach((tag) => params.append("tag", tag))
+    return `/api/papers/download?${params.toString()}`
+  }, [selectedTagButtons])
 
   const handleCreateGroup = async () => {
     const name = newGroupName.trim()
@@ -366,20 +411,47 @@ export function PaperArchive({
       {/* Tags Section */}
       {tags.length > 0 && (
         <section>
-          <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0">
-            Tags
-          </h2>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0 flex-1">
+              Tags
+            </h2>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedTagButtons.length === 0}
+                  onClick={() => {
+                    window.location.href = selectedTagDownloadHref
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {selectedTagButtons.length > 0
+                  ? "Download selected tag papers as CSV."
+                  : "Select a tag to download as CSV."}
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <div className="border-x border-b border-border bg-card p-4 space-y-4">
             <div className="flex flex-wrap gap-2">
               {tags.map((tag) => {
-                const isActive = tag === selectedTagButton
+                const isActive = selectedTagButtons.includes(tag)
                 return (
                   <button
                     key={tag}
                     type="button"
-                    onClick={() =>
-                      setSelectedTagButton((current) => (current === tag ? "" : tag))
-                    }
+                    onClick={() => {
+                      setSelectedTagButtons((current) =>
+                        current.includes(tag)
+                          ? current.filter((currentTag) => currentTag !== tag)
+                          : [...current, tag]
+                      )
+                    }}
                     className={`rounded border px-3 py-1.5 text-sm transition-colors ${
                       isActive
                         ? "border-primary bg-primary text-primary-foreground"
@@ -392,10 +464,10 @@ export function PaperArchive({
               })}
             </div>
 
-            {selectedTagButton && (
+            {selectedTagButtons.length > 0 && (
               <div className="space-y-3">
                 <h3 className="font-serif text-base font-semibold text-foreground">
-                  "{selectedTagButton}" Papers
+                  "{selectedTagButtons.join(", ")}" Papers
                 </h3>
                 {taggedPapers.length > 0 ? (
                   <div className="border border-border bg-card">
@@ -405,7 +477,7 @@ export function PaperArchive({
                   </div>
                 ) : (
                   <div className="border border-border bg-background p-6 text-center text-sm text-muted-foreground">
-                    No papers found for {selectedTagButton}.
+                    No papers found for {selectedTagButtons.join(", ")}.
                   </div>
                 )}
               </div>
@@ -416,9 +488,25 @@ export function PaperArchive({
 
       {/* All Papers Section */}
       <section>
-        <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0">
-          All Papers ({filteredPapers.length})
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="font-serif text-lg font-semibold text-foreground border-b-2 border-primary pb-1 mb-0 flex-1">
+            {allPapersTitle} ({filteredPapers.length})
+          </h2>
+          {allPapersActions}
+          {showAllPapersDownload && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild type="button" variant="outline" size="sm">
+                  <a href={allPapersDownloadHref}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </a>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download as CSV.</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
         {filteredPapers.length > 0 ? (
           <div className="border-x border-b border-border bg-card">
             {filteredPapers.map((paper, i) => (

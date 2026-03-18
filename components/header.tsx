@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { signOut, useSession } from "next-auth/react"
 import { usePathname } from "next/navigation"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
 
 interface HeaderProps {
@@ -76,6 +77,7 @@ export function Header({ currentGroupName }: HeaderProps) {
                 </button>
               </>
             )}
+            <ThemeToggle />
           </nav>
         </div>
         <div className="border-t border-border py-2 text-xs text-muted-foreground">
