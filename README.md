@@ -1,24 +1,19 @@
-# DI Lab Arxiv
+# DI Lab Paper Archive
 
-## GitHub Actions Deploy
+A web archive for managing and browsing research papers shared in the lab.
 
-Required repository secrets:
+## Stack
 
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_SSH_PRIVATE_KEY`
+- Next.js
+- TypeScript
+- MySQL
+- NextAuth (Google OAuth)
 
-Deploy flow:
+## Features
 
-1. SSH into the server
-2. `cd /home/hun/Desktop/DI_Lab_arxiv`
-3. `git pull origin main`
-4. `npm ci`
-5. `npm run build`
-6. `pm2 restart dilab-arxiv --update-env`
-
-Server requirement:
-
-- `nvm` must be installed
-- Node must be `>=20.9.0`
-- This repo uses `.nvmrc` with `22.22.0`
+- Browse and search papers
+- Submit new papers
+- Edit and delete papers
+- Organize papers by group
+- Download paper lists as CSV
+- Restrict access with Google allowlist login
